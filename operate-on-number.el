@@ -396,6 +396,44 @@ point for the operation if applicable."
          (key (read-char (format "Apply on %s:" formatted) t)))
     (apply-operation-to-number-at-point key t)))
 
+;;;###autoload
+(defun operate-on-number-at-point-or-region (&optional arg)
+  "Operate on number at point or on region.
+
+The kind of operation to perform is specified by the following
+key typed.
+
+An optional number ARG becomes a counter operand to the number at
+point for the operation if applicable."
+  (interactive "*p")
+  (if mark-active
+      (let* ((key (read-char (format "Apply on region (+-*/\\^<>#%%): ") t))
+             (arg (and current-prefix-arg
+                       (prefix-numeric-value current-prefix-arg)))
+             (oargs (or (cdr (assoc key operate-on-number-at-point-alist))
+                        (error "Unknown operator: %c" key)))
+             (defargs (nth 0 oargs))
+             (defarg (car defargs))
+             (func (nth 1 oargs))
+             (plist (nthcdr 2 oargs))
+             (display (or (plist-get plist :display) (string key)))
+             (args (let* ((prompt (format "With number %s " display))
+                          (input (if (numberp defarg)
+                                     (read-number prompt defarg)
+                                   (read-string prompt nil nil
+                                                defarg))))
+                     (list input))))
+        (save-restriction
+          (narrow-to-region (min (mark) (point)) (max (mark) (point)))
+          (goto-char (point-min))
+          (while (re-search-forward "[0-9]*\\.?[0-9]+" nil t)
+            (apply-to-number-at-point func args plist))))
+    (let* ((parsed (or (oon--parse-number-at-point)
+                       (error "No number found at point")))
+           (formatted (oon--original-number-for-display parsed))
+           (key (read-char (format "Apply on %s:" formatted) t)))
+      (apply-operation-to-number-at-point key t))))
+
 (provide 'operate-on-number)
 
 ;;; operate-on-number.el ends here
